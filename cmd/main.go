@@ -29,7 +29,7 @@ var CLI struct {
 }
 
 func Run(args []string) {
-	ctx := kong.Parse(&CLI,
+	kong.Parse(&CLI,
 		kong.Name("elb-trust-store-exporter"),
 		kong.Description("A Prometheus exporter for AWS Elastic Load Balancer (ELB) trust stores."),
 		kong.UsageOnError(),
@@ -37,48 +37,59 @@ func Run(args []string) {
 			Compact: true,
 		}),
 		kong.Vars{
-			"version": fmt.Sprintf("%s\ncommit: %s\nbuilt at: %s\nbuilt by: %s", Version, Commit, Date, BuiltBy),
+			"version": fmt.Sprintf(
+				"%s\ncommit: %s\nbuilt at: %s\nbuilt by: %s",
+				Version,
+				Commit,
+				Date,
+				BuiltBy,
+			),
 		},
 	)
 
-	switch ctx.Command() {
-	default:
-		reg := prometheus.NewRegistry()
+	reg := prometheus.NewRegistry()
 
-		versionMetric := prometheus.NewGauge(prometheus.GaugeOpts{
-			Name: "elb_trust_store_exporter_build_info",
-			Help: "A metric with a constant '1' value labeled with version, commit, date and builtBy from which the exporter was built.",
-			ConstLabels: prometheus.Labels{
-				"version": Version,
-				"commit":  Commit,
-				"date":    Date,
-				"builtBy": BuiltBy,
-			},
-		})
-		versionMetric.Set(1)
-		reg.MustRegister(versionMetric)
+	versionMetric := prometheus.NewGauge(prometheus.GaugeOpts{
+		Name: "elb_trust_store_exporter_build_info",
+		Help: "A metric with a constant '1' value labeled with version, commit, date and builtBy from which the exporter was built.",
+		ConstLabels: prometheus.Labels{
+			"version": Version,
+			"commit":  Commit,
+			"date":    Date,
+			"builtBy": BuiltBy,
+		},
+	})
+	versionMetric.Set(1)
+	reg.MustRegister(versionMetric)
 
-		interval, err := time.ParseDuration(CLI.QueryInterval)
-		if err != nil {
-			log.Fatalf("failed to parse query interval: %v", err)
-		}
-		c := collector.New(CLI.Region, CLI.TrustStoreARNs, interval)
-		reg.MustRegister(c)
+	interval, err := time.ParseDuration(CLI.QueryInterval)
+	if err != nil {
+		log.Fatalf("failed to parse query interval: %v", err)
+	}
+	c := collector.New(CLI.Region, CLI.TrustStoreARNs, interval)
+	reg.MustRegister(c)
 
-		http.Handle(CLI.MetricsPath, promhttp.HandlerFor(reg, promhttp.HandlerOpts{}))
-		http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-			w.Write([]byte(`<html>
+	http.Handle(CLI.MetricsPath, promhttp.HandlerFor(reg, promhttp.HandlerOpts{}))
+	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		if _, err := w.Write([]byte(`<html>
 			<head><title>AWS ELB Trust Store Exporter</title></head>
 			<body>
 			<h1>AWS ELB Trust Store Exporter</h1>
 			<p><a href="` + CLI.MetricsPath + `">Metrics</a></p>
 			</body>
-			</html>`))
-		})
-
-		log.Printf("Starting server on %s", CLI.ListenAddress)
-		if err := http.ListenAndServe(CLI.ListenAddress, nil); err != nil {
-			log.Fatalf("failed to start server: %v", err)
+			</html>`)); err != nil {
+			log.Printf("failed to write response: %v", err)
 		}
+	})
+
+	log.Printf("Starting server on %s", CLI.ListenAddress)
+	server := &http.Server{
+		Addr:         CLI.ListenAddress,
+		ReadTimeout:  time.Minute,
+		WriteTimeout: time.Minute,
+		IdleTimeout:  2 * time.Minute,
+	}
+	if err := server.ListenAndServe(); err != nil {
+		log.Fatalf("failed to start server: %v", err)
 	}
 }

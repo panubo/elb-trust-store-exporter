@@ -1,7 +1,7 @@
-project_name: elb-trust-store-exporter
+version: 2
 
 env:
-  - GO11MODULE=on
+    - GITHUB_REPOSITORY={{ if index .Env "GITHUB_REPOSITORY"  }}{{ .Env.GITHUB_REPOSITORY }}{{ else }}my/repo{{ end }}
 
 before:
   hooks:
@@ -14,20 +14,44 @@ builds:
       - darwin
       - linux
       - freebsd
+      - windows
     goarch:
       - amd64
       - arm64
     env:
       - CGO_ENABLED=0
 
+# archives:
+#   - formats: ['tar.gz']
+#     wrap_in_directory: true
+#     format_overrides:
+#       - goos: windows
+#         formats: ['zip']
+#     name_template: '{{ .ProjectName }}-{{ .Version }}-{{ .Os }}-{{ .Arch }}{{ if .Arm }}v{{ .Arm }}{{ end }}'
+#     files:
+#       - LICENSE
+#       - README.md
+
+checksum:
+  name_template: 'checksums.txt'
+
 snapshot:
-  name_template: "git-{{.ShortCommit}}"
+  version_template: "SNAPSHOT-{{.ShortCommit}}"
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - '^test:'
+      - 'README'
+      - Merge pull request
+      - Merge branch
 
 # Push arch specific images (push is required for multi-arch manifests)
 dockers:
   - image_templates:
-      - "public.ecr.aws/panubo/{{ .ProjectName }}:{{ .Version }}-amd64"
-      - "quay.io/panubo/{{ .ProjectName }}:{{ .Version }}-amd64"
+      - "public.ecr.aws/{{ .Env.GITHUB_REPOSITORY }}:{{ .Version }}-amd64"
+      - "quay.io/{{ .Env.GITHUB_REPOSITORY }}:{{ .Version }}-amd64"
     use: buildx
     goos: linux
     goarch: amd64
@@ -35,8 +59,8 @@ dockers:
     build_flag_templates:
       - "--platform=linux/amd64"
   - image_templates:
-      - "public.ecr.aws/panubo/{{ .ProjectName }}:{{ .Version }}-arm64"
-      - "quay.io/panubo/{{ .ProjectName }}:{{ .Version }}-arm64"
+      - "public.ecr.aws/{{ .Env.GITHUB_REPOSITORY }}:{{ .Version }}-arm64"
+      - "quay.io/{{ .Env.GITHUB_REPOSITORY }}:{{ .Version }}-arm64"
     use: buildx
     goos: linux
     goarch: arm64
@@ -46,27 +70,33 @@ dockers:
 
 # Push multi-arch manifests
 docker_manifests:
-  # Docker Hub
-  - name_template: "public.ecr.aws/panubo/{{ .ProjectName }}:{{ .Version }}"
+  # Amazon ECR Public Gallery
+  - name_template: "public.ecr.aws/{{ .Env.GITHUB_REPOSITORY }}:{{ .Version }}"
     image_templates:
-      - "public.ecr.aws/panubo/{{ .ProjectName }}:{{ .Version }}-amd64"
-      - "public.ecr.aws/panubo/{{ .ProjectName }}:{{ .Version }}-arm64"
-  - name_template: "public.ecr.aws/panubo/{{ .ProjectName }}:{{.Major}}.{{.Minor}}"
+      - "public.ecr.aws/{{ .Env.GITHUB_REPOSITORY }}:{{ .Version }}-amd64"
+      - "public.ecr.aws/{{ .Env.GITHUB_REPOSITORY }}:{{ .Version }}-arm64"
+  - name_template: "public.ecr.aws/{{ .Env.GITHUB_REPOSITORY }}:{{.Major}}.{{.Minor}}"
     image_templates:
-      - "public.ecr.aws/panubo/{{ .ProjectName }}:{{ .Version }}-amd64"
-      - "public.ecr.aws/panubo/{{ .ProjectName }}:{{ .Version }}-arm64"
+      - "public.ecr.aws/{{ .Env.GITHUB_REPOSITORY }}:{{ .Version }}-amd64"
+      - "public.ecr.aws/{{ .Env.GITHUB_REPOSITORY }}:{{ .Version }}-arm64"
   # Quay.io
-  - name_template: "quay.io/panubo/{{ .ProjectName }}:{{ .Version }}"
+  - name_template: "quay.io/{{ .Env.GITHUB_REPOSITORY }}:{{ .Version }}"
     image_templates:
-      - "quay.io/panubo/{{ .ProjectName }}:{{ .Version }}-amd64"
-      - "quay.io/panubo/{{ .ProjectName }}:{{ .Version }}-arm64"
-  - name_template: "quay.io/panubo/{{ .ProjectName }}:{{.Major}}.{{.Minor}}"
+      - "quay.io/{{ .Env.GITHUB_REPOSITORY }}:{{ .Version }}-amd64"
+      - "quay.io/{{ .Env.GITHUB_REPOSITORY }}:{{ .Version }}-arm64"
+  - name_template: "quay.io/{{ .Env.GITHUB_REPOSITORY }}:{{.Major}}.{{.Minor}}"
     image_templates:
-      - "quay.io/panubo/{{ .ProjectName }}:{{ .Version }}-amd64"
-      - "quay.io/panubo/{{ .ProjectName }}:{{ .Version }}-arm64"
+      - "quay.io/{{ .Env.GITHUB_REPOSITORY }}:{{ .Version }}-amd64"
+      - "quay.io/{{ .Env.GITHUB_REPOSITORY }}:{{ .Version }}-arm64"
 
 release:
   github:
-    owner: panubo
-    name: "{{ .ProjectName }}"
+    owner: "{{ dir .Env.GITHUB_REPOSITORY }}"
+    name: "{{ base .Env.GITHUB_REPOSITORY }}"
   draft: false
+  footer: |
+    ## Docker images
+    [Packages {{ base .Env.GITHUB_REPOSITORY }}](https://quay.io/repository/{{ .Env.GITHUB_REPOSITORY }})
+    ```shell
+    docker pull quay.io/{{ .Env.GITHUB_REPOSITORY }}:{{ .Version }}
+    ```

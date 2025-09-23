@@ -7,7 +7,7 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"errors"
-	"io/ioutil"
+	"io"
 	"log"
 	"net/http"
 	"strconv"
@@ -56,7 +56,14 @@ func New(region string, arns []string, interval time.Duration) *Collector {
 		certificateInfo: prometheus.NewDesc(
 			prometheus.BuildFQName(namespace, "certificate", "info"),
 			"Information about a certificate in a trust store.",
-			[]string{"trust_store_arn", "serial_number", "issuer", "subject", "signature_algo", "key_length"},
+			[]string{
+				"trust_store_arn",
+				"serial_number",
+				"issuer",
+				"subject",
+				"signature_algo",
+				"key_length",
+			},
 			nil,
 		),
 		certificateNotBefore: prometheus.NewDesc(
@@ -181,7 +188,11 @@ func (c *Collector) scrape() {
 
 			for _, ts := range result.TrustStores {
 				if err := c.collectTrustStoreMetrics(ctx, svc, ts, &metrics); err != nil {
-					log.Printf("Error collecting metrics for trust store %s: %v", *ts.TrustStoreArn, err)
+					log.Printf(
+						"Error collecting metrics for trust store %s: %v",
+						*ts.TrustStoreArn,
+						err,
+					)
 					success = false
 				}
 			}
@@ -194,11 +205,35 @@ func (c *Collector) scrape() {
 	defer c.mutex.Unlock()
 
 	// Exporter metrics
-	metrics = append(metrics, prometheus.MustNewConstMetric(c.exporterLastScrapeTimestamp, prometheus.GaugeValue, float64(now.Unix())))
-	metrics = append(metrics, prometheus.MustNewConstMetric(c.exporterScrapeDurationSeconds, prometheus.GaugeValue, scrapeDuration.Seconds()))
-	metrics = append(metrics, prometheus.MustNewConstMetric(c.exporterScrapeInterval, prometheus.GaugeValue, c.scrapeInterval.Seconds()))
+	metrics = append(
+		metrics,
+		prometheus.MustNewConstMetric(
+			c.exporterLastScrapeTimestamp,
+			prometheus.GaugeValue,
+			float64(now.Unix()),
+		),
+	)
+	metrics = append(
+		metrics,
+		prometheus.MustNewConstMetric(
+			c.exporterScrapeDurationSeconds,
+			prometheus.GaugeValue,
+			scrapeDuration.Seconds(),
+		),
+	)
+	metrics = append(
+		metrics,
+		prometheus.MustNewConstMetric(
+			c.exporterScrapeInterval,
+			prometheus.GaugeValue,
+			c.scrapeInterval.Seconds(),
+		),
+	)
 	if success {
-		metrics = append(metrics, prometheus.MustNewConstMetric(c.collectorSuccess, prometheus.GaugeValue, 1))
+		metrics = append(
+			metrics,
+			prometheus.MustNewConstMetric(c.collectorSuccess, prometheus.GaugeValue, 1),
+		)
 	} else {
 		metrics = append(metrics, prometheus.MustNewConstMetric(c.collectorSuccess, prometheus.GaugeValue, 0))
 	}
@@ -206,14 +241,48 @@ func (c *Collector) scrape() {
 	c.metrics = metrics
 }
 
-func (c *Collector) collectTrustStoreMetrics(ctx context.Context, svc *elasticloadbalancingv2.Client, ts types.TrustStore, metrics *[]prometheus.Metric) error {
-	*metrics = append(*metrics, prometheus.MustNewConstMetric(c.trustStoreInfo, prometheus.GaugeValue, 1, *ts.TrustStoreArn, *ts.Name, c.region))
-	*metrics = append(*metrics, prometheus.MustNewConstMetric(c.trustStoreCertificates, prometheus.GaugeValue, float64(*ts.NumberOfCaCertificates), *ts.TrustStoreArn))
-	*metrics = append(*metrics, prometheus.MustNewConstMetric(c.trustStoreRevokedEntries, prometheus.GaugeValue, float64(*ts.TotalRevokedEntries), *ts.TrustStoreArn))
+func (c *Collector) collectTrustStoreMetrics(
+	ctx context.Context,
+	svc *elasticloadbalancingv2.Client,
+	ts types.TrustStore,
+	metrics *[]prometheus.Metric,
+) error {
+	*metrics = append(
+		*metrics,
+		prometheus.MustNewConstMetric(
+			c.trustStoreInfo,
+			prometheus.GaugeValue,
+			1,
+			*ts.TrustStoreArn,
+			*ts.Name,
+			c.region,
+		),
+	)
+	*metrics = append(
+		*metrics,
+		prometheus.MustNewConstMetric(
+			c.trustStoreCertificates,
+			prometheus.GaugeValue,
+			float64(*ts.NumberOfCaCertificates),
+			*ts.TrustStoreArn,
+		),
+	)
+	*metrics = append(
+		*metrics,
+		prometheus.MustNewConstMetric(
+			c.trustStoreRevokedEntries,
+			prometheus.GaugeValue,
+			float64(*ts.TotalRevokedEntries),
+			*ts.TrustStoreArn,
+		),
+	)
 
-	bundle, err := svc.GetTrustStoreCaCertificatesBundle(ctx, &elasticloadbalancingv2.GetTrustStoreCaCertificatesBundleInput{
-		TrustStoreArn: ts.TrustStoreArn,
-	})
+	bundle, err := svc.GetTrustStoreCaCertificatesBundle(
+		ctx,
+		&elasticloadbalancingv2.GetTrustStoreCaCertificatesBundleInput{
+			TrustStoreArn: ts.TrustStoreArn,
+		},
+	)
 	if err != nil {
 		return err
 	}
@@ -225,9 +294,13 @@ func (c *Collector) collectTrustStoreMetrics(ctx context.Context, svc *elasticlo
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			log.Printf("failed to close response body: %v", err)
+		}
+	}()
 
-	pemData, err := ioutil.ReadAll(resp.Body)
+	pemData, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return err
 	}
@@ -259,9 +332,42 @@ func (c *Collector) collectTrustStoreMetrics(ctx context.Context, svc *elasticlo
 			return errors.New("unknown public key type")
 		}
 
-		*metrics = append(*metrics, prometheus.MustNewConstMetric(c.certificateInfo, prometheus.GaugeValue, 1, *ts.TrustStoreArn, cert.SerialNumber.String(), cert.Issuer.String(), cert.Subject.String(), cert.SignatureAlgorithm.String(), strconv.Itoa(keyLength)))
-		*metrics = append(*metrics, prometheus.MustNewConstMetric(c.certificateNotBefore, prometheus.GaugeValue, float64(cert.NotBefore.Unix()), *ts.TrustStoreArn, cert.SerialNumber.String(), cert.Subject.String()))
-		*metrics = append(*metrics, prometheus.MustNewConstMetric(c.certificateExpiry, prometheus.GaugeValue, float64(cert.NotAfter.Unix()), *ts.TrustStoreArn, cert.SerialNumber.String(), cert.Subject.String()))
+		*metrics = append(
+			*metrics,
+			prometheus.MustNewConstMetric(
+				c.certificateInfo,
+				prometheus.GaugeValue,
+				1,
+				*ts.TrustStoreArn,
+				cert.SerialNumber.String(),
+				cert.Issuer.String(),
+				cert.Subject.String(),
+				cert.SignatureAlgorithm.String(),
+				strconv.Itoa(keyLength),
+			),
+		)
+		*metrics = append(
+			*metrics,
+			prometheus.MustNewConstMetric(
+				c.certificateNotBefore,
+				prometheus.GaugeValue,
+				float64(cert.NotBefore.Unix()),
+				*ts.TrustStoreArn,
+				cert.SerialNumber.String(),
+				cert.Subject.String(),
+			),
+		)
+		*metrics = append(
+			*metrics,
+			prometheus.MustNewConstMetric(
+				c.certificateExpiry,
+				prometheus.GaugeValue,
+				float64(cert.NotAfter.Unix()),
+				*ts.TrustStoreArn,
+				cert.SerialNumber.String(),
+				cert.Subject.String(),
+			),
+		)
 	}
 	return nil
 }

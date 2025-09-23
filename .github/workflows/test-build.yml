@@ -1,4 +1,4 @@
-name: build
+name: Test and Build
 
 on:
   push:
@@ -14,7 +14,21 @@ permissions:
   actions: write    # Require to upload artifacts
 
 jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+
+      - name: Checkout
+        uses: actions/checkout@4
+
+      - uses: actions/setup-python@v3
+
+      - uses: pre-commit/action@v3.0.0
+        with:
+          extra_args: "--all-files --hook-stage manual"
+
   build:
+    needs: test
     runs-on: ubuntu-latest
     env:
       DOCKER_CLI_EXPERIMENTAL: "enabled"
@@ -28,7 +42,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.24'
+          go-version: '1.25'
 
       - name: Install GoReleaser
         uses: goreleaser/goreleaser-action@v6
