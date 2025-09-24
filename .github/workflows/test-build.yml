@@ -40,7 +40,7 @@ jobs:
       - name: Run golangci-lint
         uses: golangci/golangci-lint-action@v8
         with:
-          version: v2.1
+          version: latest # v2.4.0 or newer for golang 1.25
 
       - name: Run pre-commit checks
         uses: pre-commit/action@v3.0.0
