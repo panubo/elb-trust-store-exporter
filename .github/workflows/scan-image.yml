@@ -1,3 +1,5 @@
+# Source: https://github.com/panubo/reference-github-actions/blob/main/scan-image.yml
+
 name: Scan
 
 on:

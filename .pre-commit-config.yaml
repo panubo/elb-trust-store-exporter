@@ -1,3 +1,5 @@
+# Source: https://github.com/panubo/reference-github-actions/blob/main/pre-commit-configs/golang.pre-commit-config.yaml
+
 repos:
   - repo: local
     hooks:
