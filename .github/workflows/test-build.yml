@@ -6,21 +6,20 @@ env:
 on:
   push:
     branches:
-      - 'main'
+      - "main"
     tags:
-      - 'v*'
+      - "v*"
   pull_request:
 
 permissions:
-  id-token: write   # Required for OIDC
-  contents: write   # This is required for actions/checkout and creating releases
-  actions: write    # Require to upload artifacts
+  id-token: write # Required for OIDC
+  contents: write # This is required for actions/checkout and creating releases
+  actions: write # Require to upload artifacts
 
 jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-
       - name: Checkout
         uses: actions/checkout@v4
 
@@ -47,17 +46,48 @@ jobs:
         with:
           extra_args: "--all-files --hook-stage manual"
 
+  test-trivy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run Trivy scanner
+        uses: aquasecurity/trivy-action@0.33.1
+        with:
+          scan-type: fs
+          scan-ref: .
+          hide-progress: true
+          output: trivy.txt
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: 1
+
+      - name: Publish Trivy Output to Summary
+        if: success() || failure()
+        run: |
+          if [[ -s trivy.txt ]]; then
+            {
+              echo "### Trivy Scanner Output"
+              echo "<details><summary>Click to expand</summary>"
+              echo ""
+              echo '```terraform'
+              cat trivy.txt
+              echo '```'
+              echo "</details>"
+            } >> $GITHUB_STEP_SUMMARY
+          fi
+
   build:
-    needs: test
+    needs: ["test", "test-trivy"]
     runs-on: ubuntu-latest
     env:
       DOCKER_CLI_EXPERIMENTAL: "enabled"
     steps:
-
       - name: Checkout
         uses: actions/checkout@v4
         with:
-         fetch-depth: 0
+          fetch-depth: 0
 
       - name: Set up Go
         uses: actions/setup-go@v5

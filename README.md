@@ -13,17 +13,18 @@ The exporter is written in Go and uses the official Prometheus client library. I
 The exporter can be configured using command-line flags:
 
 ```
-usage: elb-trust-store-exporter [<flags>]
+Usage: elb-trust-store-exporter [flags]
+
+A Prometheus exporter for AWS Elastic Load Balancer (ELB) trust stores.
 
 Flags:
-  --web.listen-address=":9180"  Address to listen on for web interface and telemetry.
-  --web.metrics-path="/metrics"
-                                Path under which to expose metrics.
-  --region                     AWS region to query. If not specified, the region will be
-                               auto-discovered from the environment (e.g., EC2 instance metadata).
-  --query-interval="60m"       Interval at which to query the AWS API.
-  --trust-store-arns           An optional comma-separated list of ELB trust store ARNs to monitor.
-                               If not specified, all trust stores in the region will be monitored.
+  -h, --help                                     Show context-sensitive help.
+      --web.listen-address=":9180"               Address to listen on for web interface and telemetry.
+      --web.metrics-path="/metrics"              Path under which to expose metrics.
+      --region=STRING                            AWS region to query. If not specified, the region will be auto-discovered.
+      --query-interval="60m"                     Interval at which to query the AWS API.
+      --trust-store-arns=TRUST-STORE-ARNS,...    A comma-separated list of ELB trust store ARNs to monitor.
+  -v, --version                                  Print version information and exit.
 ```
 
 ### Example
