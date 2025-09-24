@@ -1,5 +1,8 @@
 name: Test and Build
 
+env:
+  GOLANG_VERSION: 1.25
+
 on:
   push:
     branches:
@@ -21,9 +24,26 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - uses: actions/setup-python@v3
+      - name: Install python
+        uses: actions/setup-python@v3
 
-      - uses: pre-commit/action@v3.0.0
+      - name: Install golang
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GOLANG_VERSION }}
+
+      - name: Install GoReleaser
+        uses: goreleaser/goreleaser-action@v6
+        with:
+          install-only: true
+
+      - name: Run golangci-lint
+        uses: golangci/golangci-lint-action@v8
+        with:
+          version: v2.1
+
+      - name: Run pre-commit checks
+        uses: pre-commit/action@v3.0.0
         with:
           extra_args: "--all-files --hook-stage manual"
 
@@ -42,7 +62,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.25'
+          go-version: ${{ env.GOLANG_VERSION }}
 
       - name: Install GoReleaser
         uses: goreleaser/goreleaser-action@v6

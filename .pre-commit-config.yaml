@@ -19,7 +19,9 @@ repos:
     rev: v2.5.0
     hooks:
       - id: golangci-lint-full
+        stages: [pre-commit]
       - id: golangci-lint-fmt
+        stages: [pre-commit]
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v6.0.0
     hooks:
