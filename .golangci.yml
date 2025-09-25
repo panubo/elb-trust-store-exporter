@@ -11,6 +11,9 @@ linters:
     - unused
     - gocritic
     - gosec
+  exclusions:
+    presets:
+      - std-error-handling
 
 formatters:
   enable:

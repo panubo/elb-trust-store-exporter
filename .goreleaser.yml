@@ -1,7 +1,7 @@
 version: 2
 
 env:
-    - GITHUB_REPOSITORY={{ if index .Env "GITHUB_REPOSITORY"  }}{{ .Env.GITHUB_REPOSITORY }}{{ else }}my/repo{{ end }}
+  - GITHUB_REPOSITORY={{ if index .Env "GITHUB_REPOSITORY"  }}{{ .Env.GITHUB_REPOSITORY }}{{ else }}my/repo{{ end }}
 
 before:
   hooks:
@@ -22,18 +22,18 @@ builds:
       - CGO_ENABLED=0
 
 archives:
-  - formats: ['tar.gz']
+  - formats: ["tar.gz"]
     wrap_in_directory: true
     format_overrides:
       - goos: windows
-        formats: ['zip']
-    name_template: '{{ .ProjectName }}-{{ .Version }}-{{ .Os }}-{{ .Arch }}{{ if .Arm }}v{{ .Arm }}{{ end }}'
+        formats: ["zip"]
+    name_template: "{{ .ProjectName }}-{{ .Version }}-{{ .Os }}-{{ .Arch }}{{ if .Arm }}v{{ .Arm }}{{ end }}"
     files:
       - LICENSE
       - README.md
 
 checksum:
-  name_template: 'checksums.txt'
+  name_template: "checksums.txt"
 
 snapshot:
   version_template: "SNAPSHOT-{{.ShortCommit}}"
@@ -42,8 +42,8 @@ changelog:
   sort: asc
   filters:
     exclude:
-      - '^test:'
-      - 'README'
+      - "^test:"
+      - "README"
       - Merge pull request
       - Merge branch
 

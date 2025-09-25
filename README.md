@@ -1,5 +1,7 @@
 # AWS ELB Trust Store Exporter
 
+[![Test and Build](https://github.com/panubo/elb-trust-store-exporter/actions/workflows/golang-test-build.yml/badge.svg)](https://github.com/panubo/elb-trust-store-exporter/actions/workflows/golang-test-build.yml)
+
 A Prometheus exporter for AWS Elastic Load Balancer (ELB) trust stores, to enable monitoring of certificate expiry.
 
 ## Overview
@@ -25,6 +27,25 @@ Flags:
       --query-interval="60m"                     Interval at which to query the AWS API.
       --trust-store-arns=TRUST-STORE-ARNS,...    A comma-separated list of ELB trust store ARNs to monitor.
   -v, --version                                  Print version information and exit.
+```
+
+## Required AWS Permissions
+
+```
+{
+	"Version": "2012-10-17",
+	"Statement": [
+		{
+			"Sid": "TrustStoreReadOnlyAccess",
+			"Effect": "Allow",
+			"Action": [
+				"elasticloadbalancing:GetTrustStore*",
+				"elasticloadbalancing:DescribeTrustStore*"
+			],
+			"Resource": "*"
+		}
+	]
+}
 ```
 
 ### Example
